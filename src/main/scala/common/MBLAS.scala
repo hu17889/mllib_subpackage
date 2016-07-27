@@ -16,10 +16,12 @@
  */
 
 package common
-
 import com.github.fommil.netlib.{BLAS => NetlibBLAS, F2jBLAS}
-import org.apache.spark.mllib.linalg.{DenseVector,SparseVector,Vector}
-
+//import org.apache.spark.mllib.linalg.{Vector => LinalgVector}
+import org.apache.spark.mllib.linalg.{DenseVector, SparseVector, Vector}
+import org.apache.spark.mllib.regression.LabeledPoint
+import org.apache.spark.mllib.tree.configuration.FeatureType._
+import org.apache.spark.mllib.tree.model.Node
 /**
  * BLAS routines for MLlib's vectors and matrices.
  */
@@ -198,4 +200,43 @@ object MBLAS extends Serializable {
         throw new IllegalArgumentException(s"scal doesn't support vector type ${x.getClass}.")
     }
   }
+
+  def test(sa:LabeledPoint,node:Node) :List[Double] = {
+    if (node.isLeaf) {
+      List(node.id.toDouble,node.predict.predict)
+    } else {
+      if (node.split.get.featureType == Continuous) {
+        if (sa.features(node.split.get.feature) <= node.split.get.threshold) {
+          test(sa, node.leftNode.get)
+          //node.leftNode.get.predict(sa.features)
+        } else {
+          test(sa, node.rightNode.get)
+        }
+      } else {
+        if (node.split.get.categories.contains(sa.features(node.split.get.feature))) {
+          test(sa, node.leftNode.get)
+        } else {
+          test(sa, node.rightNode.get)
+        }
+      }
+    }
+  }
+
+ /* def scalFeaThords(node:Node,vectormean: Vector,vectorstd:Vector) :Node = {
+      if (node.split.get.featureType == Continuous) {
+        val mean = vectormean(node.split.get.feature).toString
+        val std = vectorstd(node.split.get.feature).toString
+        val threshold = node.split.get.threshold
+        val s = threshold * std.toDouble + mean.toDouble
+        val sp :Split = new Split(node.split.get.feature-1, s, Continuous, List())
+       // node.split = Some(sp)
+        node.split = Some(sp)
+        scalFeaThords(node.leftNode.get,vectormean,vectorstd)
+        scalFeaThords(node.rightNode.get,vectormean,vectorstd)
+          //node.leftNode.get.predict(sa.features)
+        }
+    }
+*/
+
+
 }
