@@ -4,32 +4,21 @@
 
 import java.util.Calendar
 
-import malgo.{LR_OWLQN, LR_LBFGS}
+import common.mutil
+import malgo.{LR_LBFGS, LR_OWLQN}
+import org.apache.commons.cli._
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.SparkContext
-import org.apache.spark.SparkConf
-import org.apache.spark.mllib.classification.LogisticRegressionWithSGD
-import org.apache.spark.mllib.classification.LogisticRegressionWithLBFGS
-import org.apache.spark.mllib.classification.LogisticRegressionModel
+import org.apache.spark.mllib.classification.{LogisticRegressionModel, LogisticRegressionWithLBFGS, LogisticRegressionWithSGD}
 import org.apache.spark.mllib.evaluation.BinaryClassificationMetrics
-import org.apache.spark.mllib.optimization.L1Updater
-import org.apache.spark.mllib.optimization.SquaredL2Updater
-import org.apache.spark.mllib.optimization.Updater
+import org.apache.spark.mllib.linalg.{Vector => LinalgVector, Vectors}
+import org.apache.spark.mllib.optimization.{L1Updater, SquaredL2Updater, Updater}
 import org.apache.spark.mllib.regression.LabeledPoint
-import org.apache.spark.mllib.linalg.{Vector=>LinalgVector, Vectors}
 import org.apache.spark.mllib.util.MLUtils
 import org.apache.spark.rdd.RDD
 
-import scala.collection.mutable.{StringBuilder, Map}
+import scala.collection.mutable.{Map, StringBuilder}
 import scala.util.Random
-
-import java.lang.Runtime
-
-import org.apache.hadoop.fs.FileSystem
-import org.apache.hadoop.fs.Path
-
-import org.apache.commons.cli._
-
-import common.mutil
 
 class mllib_lr(sc:SparkContext, fs:FileSystem, args:Array[String]) extends malgo(args) {
 
@@ -165,7 +154,7 @@ class mllib_lr(sc:SparkContext, fs:FileSystem, args:Array[String]) extends malgo
     }
     //val trainData = MLUtils.loadLibSVMFile(sc, cmdMap("traindata")).repartition(100).cache()
     trainData.map(_.toString()).saveAsTextFile(outputPath+"/traindata")
-    val testData = MLUtils.loadLibSVMFile(sc, cmdMap("testdata"))
+    val testData = MLUtils.loadLibSVMFile(sc, cmdMap("testdata"),trainData.first().features.size)
     testData.map(_.toString()).saveAsTextFile(outputPath+"/testdata")
 
     println("************traindata line number = "+trainData.count())

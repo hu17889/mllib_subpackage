@@ -11,6 +11,6 @@ abstract class malgo(args:Array[String]) extends Serializable  {
   val analyseLog = new StringBuilder()
   val stime = Calendar.getInstance().getTimeInMillis
   def deal()
-  def predict()
+  //def predict()
   def parseCMD(args: Array[String]): Map[String, String]
 }

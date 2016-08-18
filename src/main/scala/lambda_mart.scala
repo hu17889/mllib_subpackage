@@ -4,32 +4,20 @@
 
 import java.util.Calendar
 
-import org.apache.spark.mllib.tree.{TreeInput, GradientBoostedTrees,LambdaMART}
-import org.apache.spark.mllib.tree.configuration.LambdaBoostingStrategy
-import org.apache.spark.mllib.tree.model.LambdaGradientBoostedTreesModel
-import org.apache.spark.mllib.tree.loss.{Loss,AbsoluteError,SquaredError}
-import org.apache.spark.mllib.tree.impurity.LambdaVariance
+import common.mutil
+import org.apache.commons.cli._
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.SparkContext
-
 import org.apache.spark.mllib.evaluation.BinaryClassificationMetrics
-import org.apache.spark.mllib.tree.LambdaLabeledPoint
-
-import org.apache.spark.mllib.regression.LabeledPoint
-import org.apache.spark.mllib.linalg.{Vector=>LinalgVector, Vectors}
-import org.apache.spark.mllib.util.MLUtils
+import org.apache.spark.mllib.linalg.{Vector => LinalgVector}
+import org.apache.spark.mllib.tree.configuration.LambdaBoostingStrategy
+import org.apache.spark.mllib.tree.impurity.LambdaVariance
+import org.apache.spark.mllib.tree.loss.{AbsoluteError, SquaredError}
+import org.apache.spark.mllib.tree.model.LambdaGradientBoostedTreesModel
+import org.apache.spark.mllib.tree.{LambdaLabeledPoint, LambdaMART, TreeInput}
 import org.apache.spark.rdd.RDD
 
-import scala.collection.mutable.{StringBuilder, Map}
-import scala.util.Random
-
-import java.lang.Runtime
-
-import org.apache.hadoop.fs.FileSystem
-import org.apache.hadoop.fs.Path
-
-import org.apache.commons.cli._
-
-import common.mutil
+import scala.collection.mutable.{Map, StringBuilder}
 
 class lambda_mart(sc:SparkContext, fs:FileSystem, args:Array[String]) extends malgo(args) {
 
@@ -154,18 +142,37 @@ class lambda_mart(sc:SparkContext, fs:FileSystem, args:Array[String]) extends ma
       allCount>1&&negtiveCount>=1
     }.flatMap(_._2)
     // distinct(qid,pos)
-    val trainData = trainFilter.map{case lp=>((lp.qid,lp.pos),lp)}.groupByKey().map{ case (key,lps) =>
-      val points = lps.toArray
-      val positivePoint = points.filter{_.label>=1}
-      val negtivePoint = points.filter{_.label<1}
-      if(positivePoint.length>=1) positivePoint(0) else negtivePoint(0)
+   /* val trainData = trainFilter.map{case lp=>((lp.qid,lp.pos),lp)}.groupByKey().map{
+      case (key, lps) =>
+
+        val points = lps.toArray
+        val positivePoint = points.filter {
+          _.label >= 1
+        }
+        val negtivePoint = points.filter {
+          _.label < 1
+        }
+        if (positivePoint.length >= 1) positivePoint(0)
+          negtivePoint(0)
+    }.filter()
+*/
+
+    val trainData = trainFilter.map{case lp=>((lp.qid,lp.pos),lp)}.groupByKey().filter(_._2.size == 1).map{
+      case(key,lps) =>
+        val points = lps.toArray
+        points(0)
     }
-    val testData = testFilter.map{case lp=>((lp.qid,lp.pos),lp)}.groupByKey().map{ case (key,lps) =>
-      val points = lps.toArray
-      val positivePoint = points.filter{_.label>=1}
-      val negtivePoint = points.filter{_.label<1}
-      if(positivePoint.length>=1) positivePoint(0) else negtivePoint(0)
+
+
+    val testData = testFilter.map{case lp=>((lp.qid,lp.pos),lp)}.groupByKey().filter(_._2.size == 1).map{
+      case(key,lps) =>
+        val points = lps.toArray
+        points(0)
     }
+     // val positivePoint = points.filter{_.label>=1}
+     // val negtivePoint = points.filter{_.label<1}
+     // if(positivePoint.length>=1) positivePoint(0) else negtivePoint(0)
+
 
     println("************traindata line number = "+trainData.count())
     println("************testdata line number = "+testData.count())
