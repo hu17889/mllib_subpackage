@@ -21,10 +21,9 @@ import org.apache.spark.Logging
 import org.apache.spark.annotation.{Experimental, Since}
 import org.apache.spark.api.java.JavaRDD
 import org.apache.spark.mllib.impl.PeriodicRDDCheckpointer
-import org.apache.spark.mllib.tree.configuration.LambdaBoostingStrategy
 import org.apache.spark.mllib.tree.configuration.Algo._
+import org.apache.spark.mllib.tree.configuration.LambdaBoostingStrategy
 import org.apache.spark.mllib.tree.impl.TimeTracker
-import org.apache.spark.mllib.tree.impurity.Variance
 import org.apache.spark.mllib.tree.model.{LambdaDecisionTreeModel, LambdaGradientBoostedTreesModel}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
@@ -65,7 +64,7 @@ class LambdaMART @Since("1.2.0") (private val boostingStrategy: LambdaBoostingSt
         LambdaMART.boost(input, input, boostingStrategy, validate = false)
       case Classification =>
         // Map labels to -1, +1 so binary classification can be treated as regression.
-        val remappedInput = input.map(x => new LambdaLabeledPoint((x.label * 2) - 1,0,0, x.features))
+        val remappedInput = input.map(x => new LambdaLabeledPoint((x.label * 2) - 1,"0",0, x.features))
         LambdaMART.boost(remappedInput, remappedInput, boostingStrategy, validate = false)
       case _ =>
         throw new IllegalArgumentException(s"$algo is not supported by the gradient boosting.")
@@ -101,9 +100,9 @@ class LambdaMART @Since("1.2.0") (private val boostingStrategy: LambdaBoostingSt
       case Classification =>
         // Map labels to -1, +1 so binary classification can be treated as regression.
         val remappedInput = input.map(
-          x => new LambdaLabeledPoint((x.label * 2) - 1,0,0, x.features))
+          x => new LambdaLabeledPoint((x.label * 2) - 1,"0",0, x.features))
         val remappedValidationInput = validationInput.map(
-          x => new LambdaLabeledPoint((x.label * 2) - 1,0,0, x.features))
+          x => new LambdaLabeledPoint((x.label * 2) - 1,"0",0, x.features))
         LambdaMART.boost(remappedInput, remappedValidationInput, boostingStrategy,
           validate = true)
       case _ =>
@@ -190,9 +189,9 @@ object LambdaMART extends Logging {
     }
 
     // Prepare periodic checkpointers
-    val predErrorCheckpointer = new PeriodicRDDCheckpointer[((Int,Int),(Double, Double))](
+    val predErrorCheckpointer = new PeriodicRDDCheckpointer[((String,Int),(Double, Double))](
       treeStrategy.getCheckpointInterval, input.sparkContext)
-    val validatePredErrorCheckpointer = new PeriodicRDDCheckpointer[((Int,Int),(Double, Double))](
+    val validatePredErrorCheckpointer = new PeriodicRDDCheckpointer[((String,Int),(Double, Double))](
       treeStrategy.getCheckpointInterval, input.sparkContext)
 
     timer.stop("init")
@@ -209,7 +208,7 @@ object LambdaMART extends Logging {
     baseLearners(0) = firstTreeModel
     baseLearnerWeights(0) = firstTreeWeight
 
-    var predError: RDD[((Int,Int),(Double, Double))] = LambdaGradientBoostedTreesModel.
+    var predError: RDD[((String,Int),(Double, Double))] = LambdaGradientBoostedTreesModel.
       computeInitialPredictionAndError(input, firstTreeWeight, firstTreeModel, loss)
     predErrorCheckpointer.update(predError)
     logDebug("error of gbt = " + predError.values.values.mean())
@@ -217,7 +216,7 @@ object LambdaMART extends Logging {
     // Note: A model of type regression is used since we require raw prediction
     timer.stop("building tree 0")
 
-    var validatePredError: RDD[((Int,Int),(Double, Double))] = LambdaGradientBoostedTreesModel.
+    var validatePredError: RDD[((String,Int),(Double, Double))] = LambdaGradientBoostedTreesModel.
       computeInitialPredictionAndError(validationInput, firstTreeWeight, firstTreeModel, loss)
     if (validate) validatePredErrorCheckpointer.update(validatePredError)
     var bestValidateError = if (validate) validatePredError.values.values.mean() else 0.0

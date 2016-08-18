@@ -1,9 +1,8 @@
 package org.apache.spark.mllib.tree
 
 import org.apache.spark.SparkContext
-import org.apache.spark.mllib.linalg.{Vector,Vectors}
+import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import org.apache.spark.rdd.RDD
-import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.storage.StorageLevel
 
 import scala.collection.mutable.ArrayBuffer
@@ -48,7 +47,7 @@ object TreeInput {
       }.reduce(math.max) + 1
 
     parsed.map { case (label, qid, pos, indices, values) =>
-      LambdaLabeledPoint(label,qid.toDouble.toInt,pos.toDouble.toInt, Vectors.sparse(d, indices, values),0,0)
+      LambdaLabeledPoint(label,qid,pos.toDouble.toInt, Vectors.sparse(d, indices, values),0,0)
     }
   }
 
@@ -89,18 +88,19 @@ object TreeInput {
     })
   }
 
-  def cal(input:RDD[LambdaLabeledPoint],predError: RDD[((Int,Int),(Double, Double))]): RDD[LambdaLabeledPoint] = {
+  def cal(input:RDD[LambdaLabeledPoint],predError: RDD[((String,Int),(Double, Double))]): RDD[LambdaLabeledPoint] = {
     calre(input.map{case x=>((x.qid,x.pos),x)}.join(predError))
   }
 
   // ((qid,pos),(LambdaLabeledPoint,(pred,error)))
-  private def calre(input: RDD[((Int,Int),(LambdaLabeledPoint,(Double,Double)))]): RDD[LambdaLabeledPoint] = {
-    input.map{case (key,(point,prederr))=>(point.qid,(point,prederr))}.groupByKey.flatMap{case (_,data) =>{
+  private def calre(input: RDD[((String,Int),(LambdaLabeledPoint,(Double,Double)))]): RDD[LambdaLabeledPoint] = {
+    println("begin to calre")
+    input.map{case (key,(point,prederr))=>(point.qid,(point,prederr))}.groupByKey.filter(_._2.size > 1).flatMap{case (_,data) =>{
       val ds = data.toArray
       val positives = ds.filter(_._1.label>=1)
       val negtives = ds.filter(_._1.label<1)
 
-      if(positives.length<1) {
+      if(positives.length<1 || (negtives.length <1)) {
         Array().toIterable
       } else {
         val pointPairs = positives.flatMap{case x=>{
@@ -142,22 +142,28 @@ object TreeInput {
           (keyi,wi)
         }}
         val pointMap = ds.map{case (point,(pred,error))=>(point.pos,point)}.toMap
-        val result = pointMap.map{case (pos,point)=>{
-          point.lamda = lambda.apply(pos)
-          point.w = w.apply(pos)
-          point
-        }}
+        println("pointMap:"+pointMap)
+          val result = pointMap.map{case (pos,point)=>{
+            println("input feature:"+point.toString)
+              point.lamda = lambda.apply(pos)
+              point.w = w.apply(pos)
+              new LambdaLabeledPoint(point.lamda,point.qid,point.pos,point.features,point.lamda,point.w)
+
+
+          }
+
+      }
         result
       }
 
-    }}
+    }}.filter(!_.qid.equals("error"))
   }
 
 
 }
 
 
-case class LambdaLabeledPoint(label:Double,qid:Int,pos:Int,features:Vector, var lamda:Double=0.0, var w:Double=0.0) {
+case class LambdaLabeledPoint(label:Double,qid:String,pos:Int,features:Vector, var lamda:Double=0.0, var w:Double=0.0) {
 
   override def toString: String = {
     s"($label,$qid,$pos,$lamda,$w)"

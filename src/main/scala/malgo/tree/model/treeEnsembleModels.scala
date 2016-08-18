@@ -17,18 +17,11 @@
 
 package org.apache.spark.mllib.tree.model
 
-import scala.collection.mutable
-import org.apache.spark.mllib.tree.LambdaLabeledPoint
 import com.github.fommil.netlib.BLAS.{getInstance => blas}
-import org.json4s._
-import org.json4s.JsonDSL._
-import org.json4s.jackson.JsonMethods._
-
-import org.apache.spark.{Logging, SparkContext}
 import org.apache.spark.annotation.{Experimental, Since}
 import org.apache.spark.api.java.JavaRDD
 import org.apache.spark.mllib.linalg.Vector
-import org.apache.spark.mllib.regression.LabeledPoint
+import org.apache.spark.mllib.tree.LambdaLabeledPoint
 import org.apache.spark.mllib.tree.configuration.Algo
 import org.apache.spark.mllib.tree.configuration.Algo._
 import org.apache.spark.mllib.tree.configuration.EnsembleCombiningStrategy._
@@ -37,6 +30,12 @@ import org.apache.spark.mllib.util.{Loader, Saveable}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.util.Utils
+import org.apache.spark.{Logging, SparkContext}
+import org.json4s.JsonDSL._
+import org.json4s._
+import org.json4s.jackson.JsonMethods._
+
+import scala.collection.mutable
 
 
 /**
@@ -151,7 +150,7 @@ class LambdaGradientBoostedTreesModel @Since("1.2.0") (
 
     val sc = data.sparkContext
     val remappedData = algo match {
-      case Classification => data.map(x => new LambdaLabeledPoint((x.label * 2) - 1,0,0, x.features))
+      case Classification => data.map(x => new LambdaLabeledPoint((x.label * 2) - 1,"0",0, x.features))
       case _ => data
     }
 
@@ -205,7 +204,7 @@ object LambdaGradientBoostedTreesModel extends Loader[LambdaGradientBoostedTrees
                                         data: RDD[LambdaLabeledPoint],
                                         initTreeWeight: Double,
                                         initTree: LambdaDecisionTreeModel,
-                                        loss: Loss): RDD[((Int,Int),(Double, Double))] = {
+                                        loss: Loss): RDD[((String,Int),(Double, Double))] = {
     data.map { lp =>
       val pred = initTreeWeight * initTree.predict(lp.features)
       val error = loss.computeError(pred, lp.label)
@@ -227,10 +226,10 @@ object LambdaGradientBoostedTreesModel extends Loader[LambdaGradientBoostedTrees
   @Since("1.4.0")
   def updatePredictionError(
                              data: RDD[LambdaLabeledPoint],
-                             predictionAndError: RDD[((Int,Int),(Double, Double))],
+                             predictionAndError: RDD[((String,Int),(Double, Double))],
                              treeWeight: Double,
                              tree: LambdaDecisionTreeModel,
-                             loss: Loss): RDD[((Int,Int),(Double, Double))] = {
+                             loss: Loss): RDD[((String,Int),(Double, Double))] = {
 
     val newPredError = data.map{case x=>((x.qid,x.pos),x)}.join(predictionAndError).map { case (key,(lp,(pred,error))) =>
       val newPred = pred + tree.predict(lp.features) * treeWeight
